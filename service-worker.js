@@ -1,4 +1,4 @@
-const CACHE_NAME = 'carbon-heroes-hub-v3'; /* เปลี่ยนเลขเวอร์ชันทุกครั้งที่แก้โค้ด เพื่อบังคับล้างแคชเก่า */
+const CACHE_NAME = 'carbon-heroes-hub-v4'; /* เปลี่ยนเลขเวอร์ชันทุกครั้งที่แก้โค้ด เพื่อบังคับล้างแคชเก่า */
 const ASSETS = [
   './',
   './index.html',

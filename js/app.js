@@ -79,6 +79,23 @@ function buildModel(data){
     byType[r.type].count += 1;
   });
 
+  /* จัดกลุ่มขยะเป็น 7 หมวดตามเกณฑ์ LESS ของ อบก. โดยอ้างอิงค่า EF ของแต่ละ
+     ประเภทขยะ (ตรงกับกลุ่มค่า EF ในชีต Emission Factors พอดี) แทนการพิมพ์ชื่อ
+     ประเภทละเอียดทีละรายการ — ทนทานเมื่อมีการเพิ่มชื่อประเภทย่อยใหม่ในอนาคต */
+  const byCategory = {};
+  CATEGORY_ORDER.forEach(cat => { byCategory[cat] = {weight:0, revenue:0, carbon:0, count:0}; });
+  byCategory['อื่นๆ'] = {weight:0, revenue:0, carbon:0, count:0};
+  flat.forEach(r=>{
+    if(!r.type) return;
+    const cat = categoryForType(r.type, data.ef);
+    byCategory[cat] = byCategory[cat] || {weight:0, revenue:0, carbon:0, count:0};
+    byCategory[cat].weight += r.weight||0;
+    byCategory[cat].revenue += r.total||0;
+    byCategory[cat].carbon += (typeof r.carbon==='number'?r.carbon:0);
+    byCategory[cat].count += 1;
+  });
+  if(byCategory['อื่นๆ'].count === 0) delete byCategory['อื่นๆ'];
+
   const byRound = Object.entries(data.transactions).map(([key,rows])=>({
     key, label: ROUND_LABELS[key]||key,
     weight: rows.reduce((s,r)=>s+(r.weight||0),0),
@@ -102,7 +119,27 @@ function buildModel(data){
       tier: tierOf(m.carbon),
     })).sort((a,b)=>b.carbon-a.carbon);
 
-  return {flat, totalWeight, totalRevenue, totalCarbonTx, totalCarbonAll, memberCount: (official?official.memberCount:memberSet.size), byType, byRound, members};
+  return {flat, totalWeight, totalRevenue, totalCarbonTx, totalCarbonAll, memberCount: (official?official.memberCount:memberSet.size), byType, byCategory, byRound, members};
+}
+
+/* ---------- จัดหมวด 7 ประเภทขยะตามเกณฑ์ LESS (อบก.) โดยใช้ค่า EF จับกลุ่ม ---------- */
+const CATEGORY_ORDER = ['กระดาษ','กล่อง UHT','พลาสติก','อะลูมิเนียม','เหล็ก','โลหะผสม','แก้ว'];
+const CATEGORY_EF_CLUSTERS = [
+  {ef: 5.6735,   name: 'กระดาษ'},
+  {ef: 4.255125, name: 'กล่อง UHT'},
+  {ef: 1.031,    name: 'พลาสติก'},
+  {ef: 9.127,    name: 'อะลูมิเนียม'},
+  {ef: 1.832,    name: 'เหล็ก'},
+  {ef: 4.391,    name: 'โลหะผสม'},
+  {ef: 0.276,    name: 'แก้ว'},
+  {ef: 2.2,      name: 'แก้ว'},
+  {ef: 4.89,     name: 'แก้ว'},
+];
+function categoryForType(typeName, efMap){
+  const efVal = efMap && efMap[typeName];
+  if(efVal == null) return 'อื่นๆ';
+  const match = CATEGORY_EF_CLUSTERS.find(c => Math.abs(c.ef - efVal) < 0.0005);
+  return match ? match.name : 'อื่นๆ';
 }
 
 function tierOf(carbon){
@@ -215,7 +252,7 @@ async function renderDashboard(){
 
     <div class="two-col">
       <div class="card">
-        <h3>ปริมาณขยะแยกตามประเภท (กก.)</h3>
+        <h3>ปริมาณขยะแยกตาม 7 หมวด LESS (กก.)</h3>
         <div class="chart-wrap"><canvas id="chartByType"></canvas></div>
       </div>
       <div class="card">
@@ -243,15 +280,15 @@ async function renderDashboard(){
     </div>
   `;
 
-  const typeEntries = Object.entries(MODEL.byType).sort((a,b)=>b[1].weight-a[1].weight).slice(0,8);
+  const categoryEntries = Object.entries(MODEL.byCategory);
   const hasChart = await ensureChartLib();
   if(hasChart){
     try{
       new Chart(document.getElementById('chartByType'), {
         type:'bar',
         data:{
-          labels: typeEntries.map(e=>e[0]),
-          datasets:[{label:'น้ำหนัก (กก.)', data:typeEntries.map(e=>e[1].weight), backgroundColor:'#2F9E6E', borderRadius:6}]
+          labels: categoryEntries.map(e=>e[0]),
+          datasets:[{label:'น้ำหนัก (กก.)', data:categoryEntries.map(e=>e[1].weight), backgroundColor:'#2F9E6E', borderRadius:6}]
         },
         options:{plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}}, maintainAspectRatio:false}
       });
@@ -759,7 +796,7 @@ function jsonpRequest(baseUrl, params){
       if(done) return; done = true;
       cleanup();
       reject(new Error('หมดเวลาเชื่อมต่อ (timeout) — ตรวจสอบ URL หรือลองใหม่อีกครั้ง'));
-    }, 20000);
+    }, 30000);
     function cleanup(){
       clearTimeout(timer);
       delete window[cbName];
