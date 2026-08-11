@@ -79,23 +79,32 @@ function buildModel(data){
     byType[r.type].count += 1;
   });
 
-  /* จัดกลุ่มขยะเป็น 7 หมวดตามเกณฑ์ LESS ของ อบก. โดยอ้างอิงค่า EF ของแต่ละ
-     ประเภทขยะ (ตรงกับกลุ่มค่า EF ในชีต Emission Factors พอดี) แทนการพิมพ์ชื่อ
-     ประเภทละเอียดทีละรายการ — ทนทานเมื่อมีการเพิ่มชื่อประเภทย่อยใหม่ในอนาคต */
+  /* จัดกลุ่มขยะเป็น 7 หมวดตามเกณฑ์ LESS ของ อบก. — ใช้ตัวเลขทางการจาก Backend
+     (รวม Kick-off + ทุกรอบสรุปยอดขายจริงแล้ว) ถ้ามี ไม่งั้น fallback เป็นการจับกลุ่ม
+     จากรายการธุรกรรมดิบด้วยค่า EF (จะไม่รวม Kick-off เพราะไม่มีรายการธุรกรรมของมัน) */
   const byCategory = {};
   CATEGORY_ORDER.forEach(cat => { byCategory[cat] = {weight:0, revenue:0, carbon:0, count:0}; });
-  byCategory['อื่นๆ'] = {weight:0, revenue:0, carbon:0, count:0};
-  flat.forEach(r=>{
-    if(!r.type) return;
-    const cat = categoryForType(r.type, data.ef);
-    byCategory[cat] = byCategory[cat] || {weight:0, revenue:0, carbon:0, count:0};
-    byCategory[cat].weight += r.weight||0;
-    byCategory[cat].revenue += r.total||0;
-    byCategory[cat].carbon += (typeof r.carbon==='number'?r.carbon:0);
-    byCategory[cat].count += 1;
-  });
-  if(byCategory['อื่นๆ'].count === 0) delete byCategory['อื่นๆ'];
+  if(official && official.categoryTotals){
+    Object.entries(official.categoryTotals).forEach(([cat, weight])=>{
+      byCategory[cat] = byCategory[cat] || {weight:0, revenue:0, carbon:0, count:0};
+      byCategory[cat].weight = weight;
+    });
+  } else {
+    byCategory['อื่นๆ'] = {weight:0, revenue:0, carbon:0, count:0};
+    flat.forEach(r=>{
+      if(!r.type) return;
+      const cat = categoryForType(r.type, data.ef);
+      byCategory[cat] = byCategory[cat] || {weight:0, revenue:0, carbon:0, count:0};
+      byCategory[cat].weight += r.weight||0;
+      byCategory[cat].revenue += r.total||0;
+      byCategory[cat].carbon += (typeof r.carbon==='number'?r.carbon:0);
+      byCategory[cat].count += 1;
+    });
+    if(byCategory['อื่นๆ'].count === 0) delete byCategory['อื่นๆ'];
+  }
 
+  /* byRound: ข้อมูลดิบรายรอบรับฝากขยะทุกรอบ (สำหรับตารางสรุปปฏิบัติการ — จำนวน
+     รายการ/น้ำหนัก/มูลค่า/คาร์บอนตามที่บันทึกจริง ไม่ผ่านการตรวจสอบยืนยัน) */
   const byRound = Object.entries(data.transactions).map(([key,rows])=>({
     key, label: ROUND_LABELS[key]||key,
     weight: rows.reduce((s,r)=>s+(r.weight||0),0),
@@ -103,6 +112,11 @@ function buildModel(data){
     carbon: rows.reduce((s,r)=>s+(typeof r.carbon==='number'?r.carbon:0),0),
     count: rows.length,
   }));
+
+  /* byActivity: คาร์บอนที่ลดได้ต่อ "กิจกรรม" แบบทางการ — Kick-off + ทุกรอบสรุป
+     ยอดขายจริงที่ตรวจสอบยืนยันแล้ว ผลรวมตรงกับ totalCarbonAll เป๊ะ ใช้กับกราฟ
+     "คาร์บอนที่ลดได้ต่อรอบกิจกรรม" โดยเฉพาะ (คนละชุดกับ byRound ที่เป็นข้อมูลดิบ) */
+  const byActivity = (official && official.byActivity) ? official.byActivity : byRound;
 
   /* member wallet (80% payout accumulated) from transactions */
   const walletByCode = {};
@@ -119,7 +133,11 @@ function buildModel(data){
       tier: tierOf(m.carbon),
     })).sort((a,b)=>b.carbon-a.carbon);
 
-  return {flat, totalWeight, totalRevenue, totalCarbonTx, totalCarbonAll, memberCount: (official?official.memberCount:memberSet.size), byType, byCategory, byRound, members};
+  const kickoffStats = (official && official.byActivity && official.byActivity[0] && official.byActivity[0].key === 'kickoff')
+    ? { weight: official.byActivity[0].waste, carbon: official.byActivity[0].carbon }
+    : null;
+
+  return {flat, totalWeight, totalRevenue, totalCarbonTx, totalCarbonAll, memberCount: (official?official.memberCount:memberSet.size), byType, byCategory, byRound, byActivity, kickoffStats, members};
 }
 
 /* ---------- จัดหมวด 7 ประเภทขยะตามเกณฑ์ LESS (อบก.) โดยใช้ค่า EF จับกลุ่ม ---------- */
@@ -267,6 +285,9 @@ async function renderDashboard(){
         <table>
           <thead><tr><th>รอบกิจกรรม</th><th>จำนวนรายการ</th><th>น้ำหนักรวม (กก.)</th><th>มูลค่าขาย (บาท)</th><th>คาร์บอนลดได้ (kgCO₂e)</th></tr></thead>
           <tbody>
+            ${MODEL.kickoffStats ? `<tr>
+              <td>Kick-off ECO WIN-WIN</td><td>-</td><td>${fmt(MODEL.kickoffStats.weight)}</td><td>-</td><td>${fmt(MODEL.kickoffStats.carbon)}</td>
+            </tr>` : ''}
             ${MODEL.byRound.map(r=>`<tr>
               <td>${r.label}</td><td>${r.count}</td><td>${fmt(r.weight)}</td><td>${baht(r.revenue)}</td><td>${fmt(r.carbon)}</td>
             </tr>`).join('')}
@@ -276,7 +297,7 @@ async function renderDashboard(){
     </div>
 
     <div class="note-box" style="margin-top:16px">
-      💡 ข้อมูลบนแดชบอร์ดนี้รวมทั้งกิจกรรม Kick-off ECO WIN-WIN และการรับฝากขยะสมาชิก 4 รอบ คำนวณค่าคาร์บอนที่ลดได้ตามเกณฑ์ LESS (TGO) — พร้อมขยายผลเชื่อมต่อระบบจริงของ กฟผ. ในอนาคต
+      💡 ข้อมูลบนแดชบอร์ดนี้รวมทั้งกิจกรรม Kick-off ECO WIN-WIN และการรับฝากขยะสมาชิก ${MODEL.byRound.length} รอบ คำนวณค่าคาร์บอนที่ลดได้ตามเกณฑ์ LESS (TGO) — พร้อมขยายผลเชื่อมต่อระบบจริงของ กฟผ. ในอนาคต
     </div>
   `;
 
@@ -296,8 +317,8 @@ async function renderDashboard(){
       new Chart(document.getElementById('chartByRound'), {
         type:'line',
         data:{
-          labels: MODEL.byRound.map(r=>r.label.replace('ครั้งที่ ','#')),
-          datasets:[{label:'kgCO₂e', data: MODEL.byRound.map(r=>r.carbon), borderColor:'#F5C542', backgroundColor:'rgba(245,197,66,.25)', tension:.35, fill:true, pointBackgroundColor:'#0D3D2E'}]
+          labels: MODEL.byActivity.map(r=>r.label.replace('ครั้งที่ ','#')),
+          datasets:[{label:'kgCO₂e', data: MODEL.byActivity.map(r=>r.carbon), borderColor:'#F5C542', backgroundColor:'rgba(245,197,66,.25)', tension:.35, fill:true, pointBackgroundColor:'#0D3D2E'}]
         },
         options:{plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}}, maintainAspectRatio:false}
       });
@@ -702,7 +723,7 @@ function renderEsg(){
         <p style="font-size:13px;line-height:1.7;color:var(--ink-600)">
         สมาชิก Carbon Heroes ที่เข้าร่วม <b>${MODEL.members.length} คน</b><br>
         รายได้เสริมคืนสู่สมาชิกสะสม <b>${baht(MODEL.totalRevenue*0.8)}</b><br>
-        กิจกรรมรับฝากขยะที่จัดแล้ว <b>${MODEL.byRound.length} รอบ</b> รวมกิจกรรม Kick-off
+        กิจกรรมรับฝากขยะที่จัดแล้ว <b>${MODEL.byActivity.length} กิจกรรม</b> รวมกิจกรรม Kick-off
         </p>
       </div>
       <div class="card"><h3>🏛️ Governance</h3>
