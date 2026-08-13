@@ -134,10 +134,15 @@ function buildModel(data){
     })).sort((a,b)=>b.carbon-a.carbon);
 
   const kickoffStats = (official && official.byActivity && official.byActivity[0] && official.byActivity[0].key === 'kickoff')
-    ? { weight: official.byActivity[0].waste, carbon: official.byActivity[0].carbon }
+    ? {
+        weight: official.byActivity[0].waste,
+        carbon: official.byActivity[0].carbon,
+        revenue: official.byActivity[0].revenue,
+        count: official.byActivity[0].count,
+      }
     : null;
 
-  return {flat, totalWeight, totalRevenue, totalCarbonTx, totalCarbonAll, memberCount: (official?official.memberCount:memberSet.size), byType, byCategory, byRound, byActivity, kickoffStats, members};
+  return {flat, totalWeight, totalRevenue, totalCarbonTx, totalCarbonAll, memberCount: (official?official.memberCount:memberSet.size), byType, byCategory, byRound, byActivity, kickoffStats, routineWeight: official?official.routineWeight:null, memberWeight: official?official.memberWeight:null, members};
 }
 
 /* ---------- จัดหมวด 7 ประเภทขยะตามเกณฑ์ LESS (อบก.) โดยใช้ค่า EF จับกลุ่ม ---------- */
@@ -274,30 +279,18 @@ async function renderDashboard(){
         <div class="chart-wrap"><canvas id="chartByType"></canvas></div>
       </div>
       <div class="card">
-        <h3>คาร์บอนที่ลดได้ต่อรอบกิจกรรม (kgCO₂e)</h3>
+        <h3>คาร์บอนที่ลดได้ต่อรอบการจำหน่ายให้คู่ค้า (kgCO₂e)</h3>
         <div class="chart-wrap"><canvas id="chartByRound"></canvas></div>
       </div>
     </div>
 
-    <div class="card" style="margin-top:16px">
-      <h3>สรุปรายรอบกิจกรรมรับฝากขยะ</h3>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>รอบกิจกรรม</th><th>จำนวนรายการ</th><th>น้ำหนักรวม (กก.)</th><th>มูลค่าขาย (บาท)</th><th>คาร์บอนลดได้ (kgCO₂e)</th></tr></thead>
-          <tbody>
-            ${MODEL.kickoffStats ? `<tr>
-              <td>Kick-off ECO WIN-WIN</td><td>-</td><td>${fmt(MODEL.kickoffStats.weight)}</td><td>-</td><td>${fmt(MODEL.kickoffStats.carbon)}</td>
-            </tr>` : ''}
-            ${MODEL.byRound.map(r=>`<tr>
-              <td>${r.label}</td><td>${r.count}</td><td>${fmt(r.weight)}</td><td>${baht(r.revenue)}</td><td>${fmt(r.carbon)}</td>
-            </tr>`).join('')}
-          </tbody>
-        </table>
-      </div>
+    <div class="card" style="margin-top:16px;max-width:520px;margin-left:auto;margin-right:auto">
+      <h3>สัดส่วนน้ำหนักขยะ: รูทีน vs รับฝาก/รายบุคคล (รวมทุกรอบการจำหน่าย)</h3>
+      <div class="chart-wrap" style="height:300px"><canvas id="chartRoutineSplit"></canvas></div>
     </div>
 
     <div class="note-box" style="margin-top:16px">
-      💡 ข้อมูลบนแดชบอร์ดนี้รวมทั้งกิจกรรม Kick-off ECO WIN-WIN และการรับฝากขยะสมาชิก ${MODEL.byRound.length} รอบ คำนวณค่าคาร์บอนที่ลดได้ตามเกณฑ์ LESS (TGO) — พร้อมขยายผลเชื่อมต่อระบบจริงของ กฟผ. ในอนาคต
+      💡 ข้อมูลบนแดชบอร์ดนี้รวมทั้งกิจกรรม Kick-off ECO WIN-WIN และรอบการจำหน่ายให้คู่ค้าที่ตรวจสอบยืนยันแล้วทุกรอบ คำนวณค่าคาร์บอนที่ลดได้ตามเกณฑ์ LESS (TGO) — พร้อมขยายผลเชื่อมต่อระบบจริงของ กฟผ. ในอนาคต
     </div>
   `;
 
@@ -322,6 +315,17 @@ async function renderDashboard(){
         },
         options:{plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}}, maintainAspectRatio:false}
       });
+
+      if(MODEL.routineWeight!=null && MODEL.memberWeight!=null){
+        new Chart(document.getElementById('chartRoutineSplit'), {
+          type:'pie',
+          data:{
+            labels:[`ขยะรูทีน (${fmt(MODEL.routineWeight)} กก.)`, `ขยะรับฝาก/รายบุคคล (${fmt(MODEL.memberWeight)} กก.)`],
+            datasets:[{data:[MODEL.routineWeight, MODEL.memberWeight], backgroundColor:['#F5C542','#2F9E6E']}]
+          },
+          options:{plugins:{legend:{position:'bottom'}}, maintainAspectRatio:false}
+        });
+      }
     }catch(chartErr){
       showChartFallback();
     }
@@ -331,7 +335,7 @@ async function renderDashboard(){
 
   function showChartFallback(){
     /* เครือข่ายบางแห่งบล็อกการโหลด Chart.js จาก CDN — แสดงตารางแทนกราฟโดยไม่ทำให้แอปพัง */
-    ['chartByType','chartByRound'].forEach(id=>{
+    ['chartByType','chartByRound','chartRoutineSplit'].forEach(id=>{
       const c = document.getElementById(id);
       if(c) c.replaceWith(Object.assign(document.createElement('div'), {
         className:'empty-state',
@@ -746,7 +750,7 @@ function renderEsg(){
             <tr><td>คาร์บอนที่ลดได้จริงสะสม</td><td>${fmt(MODEL.totalCarbonAll)} kgCO₂e</td></tr>
             <tr><td>จำนวนสมาชิก Carbon Heroes</td><td>${MODEL.members.length} คน</td></tr>
             <tr><td>จำนวนรายการธุรกรรมทั้งหมด</td><td>${MODEL.flat.length} รายการ</td></tr>
-            <tr><td>จำนวนรอบกิจกรรม</td><td>${MODEL.byRound.length} รอบ</td></tr>
+            <tr><td>จำนวนรอบการจำหน่ายให้คู่ค้า (รวม Kick-off)</td><td>${MODEL.byActivity.length} รอบ</td></tr>
           </tbody>
         </table>
       </div>
