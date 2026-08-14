@@ -15,16 +15,22 @@ function loadScriptOnce_(url){
   });
 }
 function ensureChartLib(){
-  if(typeof Chart !== 'undefined') return Promise.resolve(true);
+  if(typeof Chart !== 'undefined'){ applyChartDarkDefaults_(); return Promise.resolve(true); }
   if(chartLibPromise) return chartLibPromise;
   const urls = [
     'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js',
     'https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js',
   ];
   chartLibPromise = urls.reduce((p, url) => p.catch(() => loadScriptOnce_(url)), Promise.reject())
-    .then(() => true)
+    .then(() => { applyChartDarkDefaults_(); return true; })
     .catch(() => false);
   return chartLibPromise;
+}
+function applyChartDarkDefaults_(){
+  if(typeof Chart === 'undefined') return;
+  Chart.defaults.color = '#94A3B8';
+  Chart.defaults.borderColor = 'rgba(255,255,255,.08)';
+  Chart.defaults.font.family = "'Sarabun','Kanit',sans-serif";
 }
 
 /* ---------- Icons ---------- */
@@ -184,24 +190,22 @@ let MODEL = null;
 
 /* ---------- Navigation ---------- */
 const NAV = [
-  {id:'dashboard', label:'แดชบอร์ด', icon:'dashboard'},
-  {id:'bank', label:'ธนาคารขยะ', icon:'bank'},
-  {id:'carbon', label:'คาร์บอน & LESS', icon:'carbon'},
-  {id:'leaderboard', label:'ผู้นำคาร์บอน', icon:'leaderboard'},
-  {id:'learn', label:'ศูนย์เรียนรู้', icon:'learn'},
-  {id:'market', label:'ตลาดสีเขียว', icon:'market'},
-  {id:'sroi', label:'SROI', icon:'sroi'},
-  {id:'esg', label:'รายงาน ESG', icon:'esg'},
+  {id:'dashboard', label:'แดชบอร์ด', emoji:'📊'},
+  {id:'bank', label:'ธนาคารขยะ', emoji:'🏦'},
+  {id:'carbon', label:'คาร์บอน & LESS', emoji:'🌱'},
+  {id:'leaderboard', label:'ผู้นำคาร์บอน', emoji:'🏆'},
+  {id:'learn', label:'ศูนย์เรียนรู้', emoji:'📚'},
+  {id:'market', label:'ตลาดสีเขียว', emoji:'🛍️'},
+  {id:'howto', label:'ฮาวทูกู้โลก', emoji:'🎓'},
+  {id:'esg', label:'รายงาน ESG', emoji:'📋'},
 ];
 
 function renderRail(){
   const html = NAV.map(n=>`
     <button class="rail-btn" data-view="${n.id}" title="${n.label}">
-      ${ICONS[n.icon]}<span>${n.label}</span>
+      <span class="emoji">${n.emoji}</span><span>${n.label}</span>
     </button>`).join('');
-  document.getElementById('rail').innerHTML =
-    `<div class="rail-logo">${ICONS.leaf}</div>` + html;
-  document.getElementById('railMobile').innerHTML = html;
+  document.getElementById('rail').innerHTML = html;
 }
 
 function setActiveView(id){
@@ -237,7 +241,7 @@ function renderView(id, forceIfDirty){
     leaderboard: renderLeaderboard,
     learn: renderLearn,
     market: renderMarket,
-    sroi: renderSroi,
+    howto: renderHowto,
     esg: renderEsg,
   })[id]();
 }
@@ -302,7 +306,7 @@ async function renderDashboard(){
         type:'bar',
         data:{
           labels: categoryEntries.map(e=>e[0]),
-          datasets:[{label:'น้ำหนัก (กก.)', data:categoryEntries.map(e=>e[1].weight), backgroundColor:'#2F9E6E', borderRadius:6}]
+          datasets:[{label:'น้ำหนัก (กก.)', data:categoryEntries.map(e=>e[1].weight), backgroundColor:'#22C55E', borderRadius:6}]
         },
         options:{plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}}, maintainAspectRatio:false}
       });
@@ -311,7 +315,7 @@ async function renderDashboard(){
         type:'line',
         data:{
           labels: MODEL.byActivity.map(r=>r.label.replace('ครั้งที่ ','#')),
-          datasets:[{label:'kgCO₂e', data: MODEL.byActivity.map(r=>r.carbon), borderColor:'#F5C542', backgroundColor:'rgba(245,197,66,.25)', tension:.35, fill:true, pointBackgroundColor:'#0D3D2E'}]
+          datasets:[{label:'kgCO₂e', data: MODEL.byActivity.map(r=>r.carbon), borderColor:'#F5C542', backgroundColor:'rgba(245,197,66,.25)', tension:.35, fill:true, pointBackgroundColor:'#0B0F1A'}]
         },
         options:{plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}}, maintainAspectRatio:false}
       });
@@ -321,7 +325,7 @@ async function renderDashboard(){
           type:'pie',
           data:{
             labels:[`ขยะรูทีน (${fmt(MODEL.routineWeight)} กก.)`, `ขยะรับฝาก/รายบุคคล (${fmt(MODEL.memberWeight)} กก.)`],
-            datasets:[{data:[MODEL.routineWeight, MODEL.memberWeight], backgroundColor:['#F5C542','#2F9E6E']}]
+            datasets:[{data:[MODEL.routineWeight, MODEL.memberWeight], backgroundColor:['#F5C542','#22C55E']}]
           },
           options:{plugins:{legend:{position:'bottom'}}, maintainAspectRatio:false}
         });
@@ -353,7 +357,7 @@ function renderBank(){
   const efOptions = Object.keys(CH_DATA.ef).sort((a,b)=>a.localeCompare(b,'th'));
   el.innerHTML = `
     <h2 style="margin-bottom:6px">Digital Waste Bank — สมุดบัญชีธนาคารขยะดิจิทัล</h2>
-    <p style="color:var(--ink-600);margin:0 0 16px;font-size:13.5px">ข้อมูลนี้อ่าน/เขียนตรงกับ Google Sheet ของโครงการแบบเรียลไทม์ผ่าน API</p>
+    <p style="color:var(--text-dim);margin:0 0 16px;font-size:13.5px">ข้อมูลนี้อ่าน/เขียนตรงกับ Google Sheet ของโครงการแบบเรียลไทม์ผ่าน API</p>
 
     <div class="card" style="margin-bottom:18px">
       <h3>➕ เพิ่มรายการฝากขยะใหม่</h3>
@@ -383,7 +387,7 @@ function renderBank(){
         <input type="checkbox" id="txConfirmed" style="width:auto" checked> ยืนยันน้ำหนักโดยตาชั่งคู่ค้าแล้ว
       </label>
       <button class="btn gold" id="txSubmit">💾 บันทึกรายการลง Google Sheet</button>
-      <span id="txMsg" style="margin-left:10px;font-size:12.5px;color:var(--ink-600)"></span>
+      <span id="txMsg" style="margin-left:10px;font-size:12.5px;color:var(--text-dim)"></span>
     </div>
 
     <div class="search-row">
@@ -432,21 +436,21 @@ function renderBank(){
     const round = document.getElementById('txRound').value;
     const msg = document.getElementById('txMsg');
     if(!payload.code || !payload.name || !payload.type || !payload.weight || !payload.price){
-      msg.textContent = '⚠️ กรุณากรอกข้อมูลให้ครบทุกช่อง'; msg.style.color = '#C6462B';
+      msg.textContent = '⚠️ กรุณากรอกข้อมูลให้ครบทุกช่อง'; msg.style.color = '#F87171';
       return;
     }
-    btn.disabled = true; msg.style.color = 'var(--ink-600)'; msg.textContent = 'กำลังบันทึก...';
+    btn.disabled = true; msg.style.color = 'var(--text-dim)'; msg.textContent = 'กำลังบันทึก...';
     try{
       const record = await apiPost('addTransaction', {round, payload});
       if(record.error) throw new Error(record.error);
-      btn.disabled = false; msg.style.color = 'var(--leaf-500)'; msg.textContent = `✅ บันทึก ${record.id} สำเร็จ`;
+      btn.disabled = false; msg.style.color = 'var(--green)'; msg.textContent = `✅ บันทึก ${record.id} สำเร็จ`;
       CH_DATA.transactions[round].push(record);
       MODEL = buildModel(CH_DATA);
       invalidateAll();
       showToast('บันทึกรายการฝากขยะสำเร็จ 🎉');
       renderView('bank', true); setActiveView('bank');
     }catch(err){
-      btn.disabled = false; msg.style.color = '#C6462B'; msg.textContent = '❌ ' + (err.message||err);
+      btn.disabled = false; msg.style.color = '#F87171'; msg.textContent = '❌ ' + (err.message||err);
     }
   });
 
@@ -464,7 +468,7 @@ function renderBank(){
     document.getElementById('bankTbody').innerHTML = rows.map(r=>`
       <tr>
         <td>${r.id||'-'}</td>
-        <td>${r.name||'-'}<br><span style="color:var(--ink-400);font-size:11px">${r.code||''}</span></td>
+        <td>${r.name||'-'}<br><span style="color:var(--text-dimmer);font-size:11px">${r.code||''}</span></td>
         <td>${r.type||'-'}</td>
         <td>${fmt(r.weight)}</td>
         <td>${r.price!=null?baht(r.price):'-'}</td>
@@ -488,7 +492,7 @@ function renderCarbon(){
 
   el.innerHTML = `
     <h2 style="margin-bottom:6px">คาร์บอนเครดิต & โครงการ LESS</h2>
-    <p style="color:var(--ink-600);margin:0 0 16px;font-size:13.5px">คำนวณคาร์บอนที่ลดได้ตามเกณฑ์ Low Emission Support Scheme (LESS) ขององค์การบริหารจัดการก๊าซเรือนกระจก (TGO)</p>
+    <p style="color:var(--text-dim);margin:0 0 16px;font-size:13.5px">คำนวณคาร์บอนที่ลดได้ตามเกณฑ์ Low Emission Support Scheme (LESS) ขององค์การบริหารจัดการก๊าซเรือนกระจก (TGO)</p>
 
     <div class="note-box" style="margin-bottom:16px">
       <b>หลักการคำนวณ:</b> คาร์บอนที่ลดได้ (kgCO₂e) = น้ำหนักขยะรีไซเคิล (กก.) × ค่าสัมประสิทธิ์การปล่อยก๊าซเรือนกระจกที่ลดได้ (Emission Factor: EF, kgCO₂e/kg) อ้างอิงตามเกณฑ์โครงการ LESS ของ TGO ปริมาณคาร์บอนที่คำนวณได้นี้สามารถนำไปขึ้นทะเบียนขอการรับรองคาร์บอนเครดิตภาคประชาชนกับ TGO ได้ในอนาคต
@@ -524,7 +528,7 @@ function renderCarbon(){
     const rows = efEntries.filter(([name])=>name.toLowerCase().includes(q));
     document.getElementById('efTbody').innerHTML = rows.map(([name,ef])=>`
       <tr><td>${name}</td><td>${fmt(ef,3)}</td><td>${CH_DATA.price[name]!=null?baht(CH_DATA.price[name]):'-'}</td></tr>
-    `).join('') || `<tr><td colspan="3" style="text-align:center;color:var(--ink-400)">ไม่พบข้อมูล</td></tr>`;
+    `).join('') || `<tr><td colspan="3" style="text-align:center;color:var(--text-dimmer)">ไม่พบข้อมูล</td></tr>`;
   }
   document.getElementById('efSearch').addEventListener('input', draw);
   draw();
@@ -537,7 +541,7 @@ function renderLeaderboard(){
   const el = document.getElementById('view-leaderboard');
   el.innerHTML = `
     <h2 style="margin-bottom:6px">🏆 ผู้นำคาร์บอน (Leaderboard)</h2>
-    <p style="color:var(--ink-600);margin:0 0 16px;font-size:13.5px">จัดอันดับ Carbon Heroes ตามปริมาณคาร์บอนที่ลดได้สะสม</p>
+    <p style="color:var(--text-dim);margin:0 0 16px;font-size:13.5px">จัดอันดับ Carbon Heroes ตามปริมาณคาร์บอนที่ลดได้สะสม</p>
 
     <div class="grid g-4" style="margin-bottom:18px">
       ${['platinum','gold','silver','bronze'].map(cls=>{
@@ -584,7 +588,7 @@ function renderLearn(){
   const el = document.getElementById('view-learn');
   el.innerHTML = `
     <h2 style="margin-bottom:6px">ศูนย์เรียนรู้ Carbon Heroes</h2>
-    <p style="color:var(--ink-600);margin:0 0 16px;font-size:13.5px">ความรู้พื้นฐานเรื่องขยะรีไซเคิล คาร์บอนเครดิต และความยั่งยืน</p>
+    <p style="color:var(--text-dim);margin:0 0 16px;font-size:13.5px">ความรู้พื้นฐานเรื่องขยะรีไซเคิล คาร์บอนเครดิต และความยั่งยืน</p>
     <div class="grid g-3" style="margin-bottom:24px">
       ${LEARN_TOPICS.map(t=>`
         <div class="learn-card">
@@ -618,7 +622,7 @@ function renderMarket(){
     <div class="topbar" style="margin-bottom:16px">
       <div class="titles">
         <h2>ตลาดสีเขียว (Green Marketplace)</h2>
-        <p style="color:var(--ink-600);font-size:13.5px;margin-top:2px">แลกคะแนนสะสมจากยอดขายขยะเป็นของรางวัลเพื่อชุมชนและสิ่งแวดล้อม</p>
+        <p style="color:var(--text-dim);font-size:13.5px;margin-top:2px">แลกคะแนนสะสมจากยอดขายขยะเป็นของรางวัลเพื่อชุมชนและสิ่งแวดล้อม</p>
       </div>
       <div class="wallet-chip">${ICONS.coin} ยอดสะสมสมาชิกรวม ${baht(totalWallet)}</div>
     </div>
@@ -629,7 +633,7 @@ function renderMarket(){
       <div class="icon-wrap">${ICONS[it.icon]}</div>
       <div>
         <h4 style="font-size:14.5px;margin-bottom:3px;font-family:'Kanit'">${it.name}</h4>
-        <p style="font-size:12.5px;color:var(--ink-600);margin:0">${it.desc}</p>
+        <p style="font-size:12.5px;color:var(--text-dim);margin:0">${it.desc}</p>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
         <span class="price">${baht(it.price)}</span>
@@ -656,48 +660,94 @@ function renderMarket(){
 }
 
 /* ============================================================
-   SROI
+   ฮาวทูกู้โลก (community hero banner + carbon calculator + sorting guide)
    ============================================================ */
-function renderSroi(){
-  const el = document.getElementById('view-sroi');
-  const revenue = MODEL.totalRevenue;
-  const carbonValueEstimate = MODEL.totalCarbonAll * 0.3; // illustrative shadow price, บาท/kgCO2e
-  const socialValue = revenue + carbonValueEstimate;
-  const investment = 5381; // from spreadsheet: cost after deducting the scale purchase
-  const sroiRatio = (socialValue / investment);
+const CATEGORY_EF_LOOKUP = {'กระดาษ':5.6735,'กล่อง UHT':4.255125,'พลาสติก':1.031,'อะลูมิเนียม':9.127,'เหล็ก':1.832,'โลหะผสม':4.391,'แก้ว':0.276};
+const HOWTO_CALC_ITEMS = [
+  {label:'กระดาษ/ลัง', emoji:'📦', efKeys:['กระดาษลัง','กระดาษ'], fallbackCategory:'กระดาษ'},
+  {label:'ขวดพลาสติก PET', emoji:'🧴', efKeys:['PET ใส','พลาสติกรวมสี'], fallbackCategory:'พลาสติก'},
+  {label:'ขวดแก้ว', emoji:'🍾', efKeys:['ขวดแก้วใส','ขวดแก้ว'], fallbackCategory:'แก้ว'},
+  {label:'กระป๋องอะลูมิเนียม', emoji:'🥫', efKeys:['กระป๋องน้ำอัดลม','กระป๋อง'], fallbackCategory:'อะลูมิเนียม'},
+  {label:'เศษเหล็ก', emoji:'🔩', efKeys:['เหล็ก'], fallbackCategory:'เหล็ก'},
+  {label:'กล่อง UHT', emoji:'🧃', efKeys:['กล่อง UHT'], fallbackCategory:'กล่อง UHT'},
+];
+function resolveEf(item){
+  for(const k of item.efKeys){ if(CH_DATA.ef[k]!=null) return CH_DATA.ef[k]; }
+  return CATEGORY_EF_LOOKUP[item.fallbackCategory] || 0;
+}
+
+const SORT_GUIDE = [
+  {name:'กระดาษ', emoji:'📦', color:'#22C55E', tip:'ควรแห้ง สะอาด ไม่เปื้อนอาหารหรือคราบมัน'},
+  {name:'กล่อง UHT', emoji:'🧃', color:'#38BDF8', tip:'ล้าง พับ และตากให้แห้งก่อนนำไปรีไซเคิล'},
+  {name:'พลาสติก', emoji:'🧴', color:'#06D6A0', tip:'แยกประเภท ล้างสะอาด และบีบแบนก่อนทิ้ง'},
+  {name:'อะลูมิเนียม', emoji:'🥫', color:'#FB923C', tip:'บีบอัดได้เพื่อประหยัดพื้นที่จัดเก็บ'},
+  {name:'เหล็ก', emoji:'🔩', color:'#94A3B8', tip:'ปี๊บ ฝาโลหะ กระป๋องเหล็ก แยกจากอะลูมิเนียม'},
+  {name:'โลหะผสม', emoji:'⚙️', color:'#A78BFA', tip:'อุปกรณ์ไฟฟ้า มอเตอร์ สายไฟ ชิ้นส่วนต่างๆ'},
+  {name:'แก้ว', emoji:'🍾', color:'#F472B6', tip:'แยกสี ระวังของมีคม ห่อก่อนทิ้งถ้าแตก'},
+];
+
+function renderHowto(){
+  const el = document.getElementById('view-howto');
+  const totalCarbon = MODEL.totalCarbonAll;
+  const treesEquivalent = totalCarbon / 9.5; /* อ้างอิงเกณฑ์ อบก. (TGO): ต้นไม้ยืนต้น 1 ต้น ดูดซับคาร์บอนเฉลี่ย 9.5 kgCO2e/ปี */
+  const goal = 20000; /* เป้าหมายแคมเปญ ปรับได้ตามที่ทีมงานกำหนด */
+  const progressPct = Math.min(100, Math.round((totalCarbon/goal)*1000)/10);
 
   el.innerHTML = `
-    <h2 style="margin-bottom:6px">SROI — ผลตอบแทนทางสังคมจากการลงทุน</h2>
-    <p style="color:var(--ink-600);margin:0 0 16px;font-size:13.5px">Social Return on Investment ของโครงการธนาคารขยะโรงไฟฟ้ากระบี่</p>
-
-    <div class="note-box" style="margin-bottom:18px">
-      SROI ประเมินมูลค่าทางสังคม สิ่งแวดล้อม และเศรษฐกิจ เทียบกับเงินลงทุนตั้งต้น สูตรคำนวณคือ<br>
-      <b>SROI Ratio = มูลค่าผลลัพธ์ทางสังคมทั้งหมด ÷ มูลค่าการลงทุน</b><br>
-      ตัวเลขด้านล่างเป็น <b>ตัวอย่างประมาณการ</b> เพื่อสาธิตแนวทางคำนวณ ควรปรับค่าพารามิเตอร์ให้เหมาะสมเมื่อใช้งานจริง
+    <div class="howto-hero">
+      <h2>พลังชุมชนกู้โลก 🌍</h2>
+      <p>ปัจจุบันชาวโรงไฟฟ้ากระบี่ร่วมใจกันลดคาร์บอนไปแล้วกว่า <b>${fmt(totalCarbon)} kgCO₂e</b> ซึ่งเทียบเท่ากับการปลูกต้นไม้ยืนต้นได้ถึง <b>${fmt(treesEquivalent,0)} ต้น</b>! 🌳</p>
+      <p class="hero-sub">(อ้างอิงเกณฑ์ อบก. TGO: ต้นไม้ยืนต้น 1 ต้น ช่วยดูดซับก๊าซคาร์บอนไดออกไซด์ได้เฉลี่ีย 9.5 kgCO₂e/ปี)</p>
+      <div class="progress-track"><div class="progress-fill" style="width:${progressPct}%"></div></div>
+      <div class="progress-labels">
+        <span>0 kgCO₂e</span>
+        <span>เป้าหมายปีนี้: ${fmt(goal,0)} kgCO₂e (${progressPct}%)</span>
+      </div>
     </div>
 
-    <div class="grid g-3" style="margin-bottom:18px">
-      <div class="stat-card gold"><div class="stat-icon">${ICONS.coin}</div><div class="stat-val">${baht(revenue)}</div><div class="stat-label">มูลค่ายอดขายขยะ (Economic Value)</div></div>
-      <div class="stat-card leaf"><div class="stat-icon">${ICONS.leaf}</div><div class="stat-val">${baht(carbonValueEstimate)}</div><div class="stat-label">มูลค่าคาร์บอนที่ลดได้ (โดยประมาณ)</div></div>
-      <div class="stat-card forest"><div class="stat-icon">${ICONS.sroi}</div><div class="stat-val">${fmt(sroiRatio,2)} : 1</div><div class="stat-label">SROI Ratio โดยประมาณ</div></div>
-    </div>
+    <div class="grid g-2">
+      <div class="card">
+        <h3>🧮 เครื่องจำลองคำนวณคาร์บอน</h3>
+        <p style="font-size:12.5px;color:var(--text-dim);margin:0 0 14px">ลองกรอกน้ำหนักขยะที่คุณมีอยู่ที่บ้าน เพื่อดูความคุ้มค่าและปริมาณคาร์บอนไดออกไซด์ที่คุณช่วยโลกได้ในรอบฝากถัดไป!</p>
+        <div id="calcRows"></div>
+        <div class="calc-result" id="calcResult">กรอกน้ำหนักด้านบนเพื่อดูผลลัพธ์</div>
+      </div>
 
-    <div class="card">
-      <h3>องค์ประกอบมูลค่าทางสังคม</h3>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>องค์ประกอบ</th><th>มูลค่า (บาท)</th><th>หมายเหตุ</th></tr></thead>
-          <tbody>
-            <tr><td>รายได้สมาชิกจากการขายขยะ (Economic)</td><td>${baht(revenue*0.8)}</td><td>80% ของยอดขายจ่ายคืนสมาชิก</td></tr>
-            <tr><td>เงินทุนหมุนเวียนโครงการ (Sustainability)</td><td>${baht(revenue*0.2)}</td><td>20% บริหารความต่อเนื่อง</td></tr>
-            <tr><td>มูลค่าคาร์บอนที่ลดได้ (Environmental)</td><td>${baht(carbonValueEstimate)}</td><td>ประมาณการที่ 0.3 บาท/kgCO₂e</td></tr>
-            <tr style="font-weight:700"><td>รวมมูลค่าทางสังคมทั้งหมด</td><td>${baht(socialValue)}</td><td>-</td></tr>
-            <tr><td>เงินลงทุนตั้งต้น (อ้างอิงค่าเครื่องชั่ง)</td><td>${baht(investment)}</td><td>จากบัญชีสรุปยอดขายสะสม</td></tr>
-          </tbody>
-        </table>
+      <div class="card">
+        <h3>♻️ วิธีแยกขยะ 7 ประเภท</h3>
+        <p style="font-size:12.5px;color:var(--text-dim);margin:0 0 14px">แยกให้ถูกประเภท เพิ่มมูลค่า ลดคาร์บอน</p>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          ${SORT_GUIDE.map(s=>`
+            <div class="sort-card">
+              <div class="sort-icon" style="background:${s.color}26;color:${s.color}">${s.emoji}</div>
+              <div><h4>${s.name}</h4><p>${s.tip}</p></div>
+            </div>`).join('')}
+        </div>
       </div>
     </div>
   `;
+
+  const rows = document.getElementById('calcRows');
+  rows.innerHTML = HOWTO_CALC_ITEMS.map((it,i)=>`
+    <div class="calc-row">
+      <label><span>${it.emoji}</span> ${it.label}</label>
+      <input type="number" min="0" step="0.1" data-idx="${i}" class="calc-input" placeholder="0">
+      <span class="calc-unit">กก.</span>
+    </div>`).join('');
+
+  function recalc(){
+    let totalW = 0, totalC = 0;
+    document.querySelectorAll('.calc-input').forEach(inp=>{
+      const w = parseFloat(inp.value)||0;
+      const item = HOWTO_CALC_ITEMS[inp.dataset.idx];
+      totalW += w;
+      totalC += w * resolveEf(item);
+    });
+    const result = document.getElementById('calcResult');
+    if(totalW===0){ result.textContent = 'กรอกน้ำหนักด้านบนเพื่อดูผลลัพธ์'; return; }
+    result.innerHTML = `น้ำหนักรวม ${fmt(totalW)} กก. ช่วยลดคาร์บอนได้ <b>${fmt(totalC,2)} kgCO₂e</b> 🎉 (เทียบเท่าปลูกต้นไม้ ${fmt(totalC/9.5,2)} ต้น)`;
+  }
+  rows.addEventListener('input', recalc);
 }
 
 /* ============================================================
@@ -710,28 +760,28 @@ function renderEsg(){
     <div class="topbar" style="margin-bottom:14px">
       <div class="titles">
         <h2>รายงาน ESG โครงการ Carbon Heroes</h2>
-        <p style="color:var(--ink-600);font-size:13.5px;margin-top:2px">สรุปผลด้านสิ่งแวดล้อม สังคม และธรรมาภิบาล ณ วันที่ ${today}</p>
+        <p style="color:var(--text-dim);font-size:13.5px;margin-top:2px">สรุปผลด้านสิ่งแวดล้อม สังคม และธรรมาภิบาล ณ วันที่ ${today}</p>
       </div>
       <button class="btn" id="printBtn">🖨️ พิมพ์ / บันทึก PDF</button>
     </div>
 
     <div class="grid g-3" style="margin-bottom:16px">
       <div class="card"><h3>🌱 Environmental</h3>
-        <p style="font-size:13px;line-height:1.7;color:var(--ink-600)">
+        <p style="font-size:13px;line-height:1.7;color:var(--text-dim)">
         ปริมาณขยะรีไซเคิลเข้าสู่ระบบสะสม <b>${fmt(MODEL.totalWeight)} กก.</b><br>
         คาร์บอนที่ลดได้จริงสะสม <b>${fmt(MODEL.totalCarbonAll)} kgCO₂e</b><br>
         เทียบเท่าการปลูกต้นไม้ดูดซับคาร์บอนประมาณ <b>${fmt(MODEL.totalCarbonAll/21)} ต้น</b> (ค่าเฉลี่ย ~21 kgCO₂e/ต้น/ปี)
         </p>
       </div>
       <div class="card"><h3>🤝 Social</h3>
-        <p style="font-size:13px;line-height:1.7;color:var(--ink-600)">
+        <p style="font-size:13px;line-height:1.7;color:var(--text-dim)">
         สมาชิก Carbon Heroes ที่เข้าร่วม <b>${MODEL.members.length} คน</b><br>
         รายได้เสริมคืนสู่สมาชิกสะสม <b>${baht(MODEL.totalRevenue*0.8)}</b><br>
         กิจกรรมรับฝากขยะที่จัดแล้ว <b>${MODEL.byActivity.length} กิจกรรม</b> รวมกิจกรรม Kick-off
         </p>
       </div>
       <div class="card"><h3>🏛️ Governance</h3>
-        <p style="font-size:13px;line-height:1.7;color:var(--ink-600)">
+        <p style="font-size:13px;line-height:1.7;color:var(--text-dim)">
         โครงสร้างแบ่งรายได้โปร่งใส 80/15/5 ระหว่างสมาชิก ทีมชั่ง-เก็บ-ขน และทีมนำขาย<br>
         บันทึกทุกธุรกรรมด้วย Transaction ID ตรวจสอบย้อนกลับได้<br>
         อ้างอิงมาตรฐานคำนวณคาร์บอนตามเกณฑ์ LESS ของ TGO
@@ -864,11 +914,11 @@ function renderApiSetupForm(prefillError){
   loading.innerHTML = `
     <div class="card" style="max-width:520px;margin:20px auto;text-align:left">
       <h3>🔗 เชื่อมต่อกับ Google Sheet</h3>
-      <p style="font-size:13px;color:var(--ink-600);line-height:1.6;margin-bottom:12px">
+      <p style="font-size:13px;color:var(--text-dim);line-height:1.6;margin-bottom:12px">
         วาง URL ของ Apps Script Web App ที่ได้ตอน Deploy (ลงท้ายด้วย <code>/exec</code>)
         ระบบจะจำไว้ในเบราว์เซอร์นี้ ไม่ต้องแก้ไฟล์ใดๆ ในเครื่อง
       </p>
-      ${prefillError ? `<p style="font-size:12.5px;color:#C6462B;margin-bottom:10px">❌ ${prefillError}</p>` : ''}
+      ${prefillError ? `<p style="font-size:12.5px;color:#F87171;margin-bottom:10px">❌ ${prefillError}</p>` : ''}
       <input id="apiUrlInput" type="text" placeholder="https://script.google.com/macros/s/.../exec"
         style="width:100%;margin-bottom:10px" value="${getApiUrl()==='วาง_URL_ที่ได้จาก_Deploy_ตรงนี้'?'':getApiUrl()}">
       <button class="btn gold" id="apiUrlSubmit" style="width:100%">เชื่อมต่อ</button>
