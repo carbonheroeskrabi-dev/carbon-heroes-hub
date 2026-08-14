@@ -336,3 +336,19 @@ footer.app-footer{
 }
 .sort-card h4{font-size:14px;color:var(--text);margin-bottom:2px}
 .sort-card p{font-size:12px;color:var(--text-dim);margin:0;line-height:1.5}
+/* Mobile bottom nav - ซ่อนบน desktop */
+.pillnav-mobile {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .pillnav-mobile {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    /* ปรับสี/พื้นหลังให้เข้ากับธีม dark mode ทีหลังได้ */
+  }
+}
